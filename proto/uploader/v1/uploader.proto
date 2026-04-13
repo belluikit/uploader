@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package uploader.v1;
+
+option go_package = "github.com/trendvidia/uploader/proto/uploader/v1;uploaderpb";
+
+// TransferService handles resumable file uploads and downloads.
+service TransferService {
+  // Upload streams file chunks from client to server.
+  // The first message must contain UploadMetadata; subsequent messages carry chunks.
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+
+  // Download streams file chunks from server to client.
+  // The first response message contains DownloadMetadata; subsequent messages carry chunks.
+  rpc Download(DownloadRequest) returns (stream DownloadResponse);
+
+  // QueryUpload returns the state of an upload session for resume negotiation.
+  rpc QueryUpload(QueryUploadRequest) returns (QueryUploadResponse);
+
+  // QueryDownload returns the state of a download session for resume negotiation.
+  rpc QueryDownload(QueryDownloadRequest) returns (QueryDownloadResponse);
+}
+
+// UploadRequest is sent by the client in a streaming fashion.
+message UploadRequest {
+  oneof payload {
+    UploadMetadata metadata = 1;
+    UploadChunk chunk = 2;
+  }
+}
+
+// UploadMetadata is the first message in an Upload stream.
+message UploadMetadata {
+  string session_id = 1;    // Empty for new upload, set for resume.
+  string filename = 2;      // Original filename.
+  int64 file_size = 3;      // Total file size in bytes.
+  bytes file_hash = 4;      // SHA-256 of the entire source file.
+  int64 resume_offset = 5;  // Byte offset to resume from (0 for new).
+}
+
+// UploadChunk carries a segment of file data.
+message UploadChunk {
+  int64 offset = 1;
+  bytes data = 2;
+}
+
+// UploadResponse is returned after the upload stream completes.
+message UploadResponse {
+  string session_id = 1;
+  string file_id = 2;
+  int64 committed_size = 3;
+  bool complete = 4;
+}
+
+// DownloadRequest initiates a file download.
+message DownloadRequest {
+  string file_id = 1;
+  string session_id = 2;    // Empty for new download, set for resume.
+  int64 offset = 3;         // Byte offset to start from (0 for full download).
+  bytes file_hash = 4;      // Expected file hash for integrity check on resume.
+}
+
+// DownloadResponse is streamed from server to client.
+message DownloadResponse {
+  oneof payload {
+    DownloadMetadata metadata = 1;
+    DownloadChunk chunk = 2;
+  }
+}
+
+// DownloadMetadata is the first message in a Download stream.
+message DownloadMetadata {
+  string session_id = 1;
+  string filename = 2;
+  int64 file_size = 3;
+  bytes file_hash = 4;      // SHA-256 of the full server-side file.
+}
+
+// DownloadChunk carries a segment of file data.
+message DownloadChunk {
+  int64 offset = 1;
+  bytes data = 2;
+}
+
+// QueryUploadRequest asks for the state of an upload session.
+message QueryUploadRequest {
+  string session_id = 1;
+}
+
+// QueryUploadResponse returns the upload session state.
+message QueryUploadResponse {
+  string session_id = 1;
+  int64 committed_offset = 2;
+  bytes file_hash = 3;
+  bool expired = 4;
+}
+
+// QueryDownloadRequest asks for the state of a download session.
+message QueryDownloadRequest {
+  string session_id = 1;
+}
+
+// QueryDownloadResponse returns the download session state.
+message QueryDownloadResponse {
+  string session_id = 1;
+  string file_id = 2;
+  int64 downloaded_offset = 3;
+  bytes file_hash = 4;
+  bool expired = 5;
+}
