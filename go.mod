@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	fyne.io/fyne/v2 v2.7.3
 	github.com/spf13/cobra v1.10.2
-	github.com/trendvidia/protowire v0.0.0-00010101000000-000000000000
+	github.com/trendvidia/protowire-go v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )
@@ -48,4 +48,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/trendvidia/protowire => ../protowire
+
+replace github.com/trendvidia/protowire-go => ../protowire-go
