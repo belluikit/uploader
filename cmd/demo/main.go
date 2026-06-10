@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"sync"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/widget"
+	"github.com/trendvidia/fyne/v2"
+	"github.com/trendvidia/fyne/v2/app"
+	"github.com/trendvidia/fyne/v2/container"
+	"github.com/trendvidia/fyne/v2/data/binding"
+	"github.com/trendvidia/fyne/v2/dialog"
+	"github.com/trendvidia/fyne/v2/layout"
+	"github.com/trendvidia/fyne/v2/widget"
 
 	"github.com/trendvidia/uploader/sdk"
 )
