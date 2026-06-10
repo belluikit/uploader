@@ -11,6 +11,7 @@ import (
 	"github.com/trendvidia/fyne/v2/container"
 	"github.com/trendvidia/fyne/v2/data/binding"
 	"github.com/trendvidia/fyne/v2/dialog"
+	"github.com/trendvidia/fyne/v2/geo"
 	"github.com/trendvidia/fyne/v2/layout"
 	"github.com/trendvidia/fyne/v2/widget"
 
@@ -20,7 +21,7 @@ import (
 func main() {
 	a := app.New()
 	w := a.NewWindow("File Transfer Demo")
-	w.Resize(fyne.NewSize(500, 340))
+	w.Resize(geo.NewSize(500, 340))
 
 	client, err := sdk.New("localhost:9090")
 	if err != nil {
@@ -188,5 +189,5 @@ func main() {
 	)
 
 	w.SetContent(container.NewPadded(content))
-	w.ShowAndRun()
+	fyne.ShowAndRun(w)
 }
