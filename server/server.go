@@ -100,9 +100,11 @@ func (s *Server) Upload(stream uploaderpb.TransferService_UploadServer) error {
 		}
 	}
 
-	// Check if the full file has been received.
+	// Check if the full file has been received. A session that was already
+	// complete is finalized once only: this is what a client sees when it
+	// resumes after the response to a finished upload was lost.
 	complete := sess.CommittedOffset >= sess.FileSize
-	if complete {
+	if complete && !sess.Complete {
 		if err := s.storage.FinalizeUpload(sess.FileID); err != nil {
 			return status.Errorf(codes.Internal, "finalize upload: %v", err)
 		}
@@ -167,6 +169,11 @@ func (s *Server) resolveUploadSession(meta *uploaderpb.UploadMetadata) (*session
 		sess, err := s.loadUploadSession(meta)
 		if err != nil {
 			return nil, err
+		}
+		// A finished upload has been moved out of staging; it cannot be
+		// rewound, only reported.
+		if sess.Complete && meta.ResumeOffset < sess.CommittedOffset {
+			return nil, status.Error(codes.FailedPrecondition, "upload already complete")
 		}
 		// If client wants to resume at an earlier offset, truncate.
 		if meta.ResumeOffset < sess.CommittedOffset {

@@ -476,3 +476,55 @@ func TestStartUploadValidation(t *testing.T) {
 		t.Errorf("unknown session: got %v, want NotFound", err)
 	}
 }
+
+func TestUploadOnCompletedSession(t *testing.T) {
+	client, cleanup := setup(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	content := bytes.Repeat([]byte("done"), 500)
+	hash := sha256.Sum256(content)
+	send := func(meta *uploaderpb.UploadMetadata, data []byte) (*uploaderpb.UploadResponse, error) {
+		stream, err := client.Upload(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := stream.Send(&uploaderpb.UploadRequest{Payload: &uploaderpb.UploadRequest_Metadata{Metadata: meta}}); err != nil {
+			t.Fatal(err)
+		}
+		if len(data) > 0 {
+			if err := stream.Send(&uploaderpb.UploadRequest{Payload: &uploaderpb.UploadRequest_Chunk{
+				Chunk: &uploaderpb.UploadChunk{Offset: meta.ResumeOffset, Data: data},
+			}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return stream.CloseAndRecv()
+	}
+
+	first, err := send(&uploaderpb.UploadMetadata{Filename: "f", FileSize: int64(len(content)), FileHash: hash[:]}, content)
+	if err != nil || !first.Complete {
+		t.Fatalf("first upload: %+v %v", first, err)
+	}
+
+	// Resuming at the end of a completed session reports it again.
+	again, err := send(&uploaderpb.UploadMetadata{
+		SessionId: first.SessionId, Filename: "f", FileSize: int64(len(content)),
+		FileHash: hash[:], ResumeOffset: int64(len(content)),
+	}, nil)
+	if err != nil {
+		t.Fatalf("resume of a completed session: %v", err)
+	}
+	if !again.Complete || again.FileId != first.FileId {
+		t.Errorf("resume of a completed session = %+v, want complete with file %s", again, first.FileId)
+	}
+
+	// Rewinding a finalized upload is refused, not attempted.
+	_, err = send(&uploaderpb.UploadMetadata{
+		SessionId: first.SessionId, Filename: "f", FileSize: int64(len(content)),
+		FileHash: hash[:], ResumeOffset: 0,
+	}, content[:10])
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("rewind of a completed session: %v, want FailedPrecondition", err)
+	}
+}
