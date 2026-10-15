@@ -2,8 +2,9 @@ package session
 
 import (
 	"errors"
-	"os"
+	"io/fs"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -26,7 +27,9 @@ func TestSessionStoreRejectsTraversalID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bad := "../../../pwned"
+	// "../../escaped" from sessions/{upload,download}/ would land at
+	// root/escaped.session, inside the tree we walk below.
+	bad := "../../escaped"
 
 	if err := store.SaveDownload(&DownloadSession{SessionID: bad}); !errors.Is(err, ErrInvalidSessionID) {
 		t.Errorf("SaveDownload: %v, want ErrInvalidSessionID", err)
@@ -37,8 +40,19 @@ func TestSessionStoreRejectsTraversalID(t *testing.T) {
 	if _, err := store.LoadUpload(bad); !errors.Is(err, ErrSessionNotFound) {
 		t.Errorf("LoadUpload: %v, want ErrSessionNotFound", err)
 	}
-	// Nothing escaped the store directory.
-	if _, err := os.Stat(filepath.Join(root, "pwned.session")); err == nil {
-		t.Fatal("a session file was written outside the store")
+
+	// No .session file exists anywhere under root outside the store.
+	storeDir := filepath.Join(root, "sessions")
+	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(p) != ".session" {
+			return nil
+		}
+		if rel, _ := filepath.Rel(storeDir, p); strings.HasPrefix(rel, "..") {
+			t.Errorf("session file escaped the store: %s", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
