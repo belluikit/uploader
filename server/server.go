@@ -4,8 +4,10 @@ package server
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -61,7 +63,7 @@ func (s *Server) Upload(stream uploaderpb.TransferService_UploadServer) error {
 	// First message must be metadata.
 	first, err := stream.Recv()
 	if err != nil {
-		return status.Errorf(codes.Internal, "recv metadata: %v", err)
+		return streamError("recv metadata", err)
 	}
 	meta := first.GetMetadata()
 	if meta == nil {
@@ -85,18 +87,18 @@ func (s *Server) Upload(stream uploaderpb.TransferService_UploadServer) error {
 		if err != nil {
 			// Save progress before returning error.
 			_ = s.sessions.SaveUpload(sess)
-			return status.Errorf(codes.Internal, "recv chunk: %v", err)
+			return streamError("recv chunk", err)
 		}
 		chunk := msg.GetChunk()
 		if chunk == nil {
 			return status.Error(codes.InvalidArgument, "expected chunk message")
 		}
 		if err := s.storage.WriteChunk(sess.FileID, chunk.Offset, chunk.Data); err != nil {
-			return status.Errorf(codes.Internal, "write chunk: %v", err)
+			return internalError("write chunk", err)
 		}
 		sess.CommittedOffset = chunk.Offset + int64(len(chunk.Data))
 		if err := s.sessions.SaveUpload(sess); err != nil {
-			return status.Errorf(codes.Internal, "save session: %v", err)
+			return internalError("save session", err)
 		}
 	}
 
@@ -106,7 +108,7 @@ func (s *Server) Upload(stream uploaderpb.TransferService_UploadServer) error {
 	complete := sess.CommittedOffset >= sess.FileSize
 	if complete && !sess.Complete {
 		if err := s.storage.FinalizeUpload(sess.FileID); err != nil {
-			return status.Errorf(codes.Internal, "finalize upload: %v", err)
+			return internalError("finalize upload", err)
 		}
 		sess.Complete = true
 		_ = s.sessions.SaveUpload(sess)
@@ -178,7 +180,7 @@ func (s *Server) resolveUploadSession(meta *uploaderpb.UploadMetadata) (*session
 		// If client wants to resume at an earlier offset, truncate.
 		if meta.ResumeOffset < sess.CommittedOffset {
 			if err := s.storage.TruncateTo(sess.FileID, meta.ResumeOffset); err != nil {
-				return nil, status.Errorf(codes.Internal, "truncate: %v", err)
+				return nil, internalError("truncate", err)
 			}
 			sess.CommittedOffset = meta.ResumeOffset
 		}
@@ -188,7 +190,7 @@ func (s *Server) resolveUploadSession(meta *uploaderpb.UploadMetadata) (*session
 	// New upload session.
 	fileID, err := s.storage.CreateUpload(meta.Filename)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "create upload: %v", err)
+		return nil, internalError("create upload", err)
 	}
 	now := time.Now().Unix()
 	sess := &session.UploadSession{
@@ -201,7 +203,7 @@ func (s *Server) resolveUploadSession(meta *uploaderpb.UploadMetadata) (*session
 		UpdatedAt: now,
 	}
 	if err := s.sessions.SaveUpload(sess); err != nil {
-		return nil, status.Errorf(codes.Internal, "save new session: %v", err)
+		return nil, internalError("save new session", err)
 	}
 	return sess, nil
 }
@@ -217,7 +219,7 @@ func (s *Server) loadUploadSession(meta *uploaderpb.UploadMetadata) (*session.Up
 		if err == session.ErrSessionNotFound {
 			return nil, status.Error(codes.NotFound, "upload session not found")
 		}
-		return nil, status.Errorf(codes.Internal, "load session: %v", err)
+		return nil, internalError("load session", err)
 	}
 	if !bytes.Equal(sess.FileHash, meta.FileHash) {
 		return nil, status.Error(codes.FailedPrecondition, "file changed since session was created")
@@ -230,30 +232,43 @@ func (s *Server) Download(req *uploaderpb.DownloadRequest, stream uploaderpb.Tra
 	if req.FileId == "" {
 		return status.Error(codes.InvalidArgument, "file_id is required")
 	}
+	// file_id and session_id become path components; reject anything that is
+	// not a server-generated ID before it reaches the filesystem.
+	if !storage.ValidFileID(req.FileId) {
+		return status.Error(codes.InvalidArgument, "invalid file_id")
+	}
+	if req.SessionId != "" && !session.ValidSessionID(req.SessionId) {
+		return status.Error(codes.InvalidArgument, "invalid session_id")
+	}
+
+	// Open first, so a missing file is NotFound regardless of the other
+	// checks below; only a genuine open failure is Internal.
+	reader, totalSize, err := s.storage.OpenFile(req.FileId, req.Offset)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return status.Error(codes.NotFound, "file not found")
+		}
+		return internalError("open file", err)
+	}
+	defer reader.Close()
 
 	// Check file integrity on resume.
 	if len(req.FileHash) > 0 {
 		currentHash, err := s.storage.FileHash(req.FileId)
 		if err != nil {
-			return status.Errorf(codes.Internal, "compute file hash: %v", err)
+			return internalError("compute file hash", err)
 		}
 		if !bytes.Equal(currentHash, req.FileHash) {
 			return status.Error(codes.FailedPrecondition, "file changed since download session was created")
 		}
 	}
 
-	reader, totalSize, err := s.storage.OpenFile(req.FileId, req.Offset)
-	if err != nil {
-		return status.Errorf(codes.NotFound, "open file: %v", err)
-	}
-	defer reader.Close()
-
 	// Compute hash for metadata (only for new downloads without offset).
 	var fileHash []byte
 	if req.Offset == 0 {
 		h, err := s.storage.FileHash(req.FileId)
 		if err != nil {
-			return status.Errorf(codes.Internal, "file hash: %v", err)
+			return internalError("file hash", err)
 		}
 		fileHash = h
 	} else {
@@ -273,7 +288,7 @@ func (s *Server) Download(req *uploaderpb.DownloadRequest, stream uploaderpb.Tra
 		DownloadedOffset: req.Offset,
 	}
 	if err := s.sessions.SaveDownload(sess); err != nil {
-		return status.Errorf(codes.Internal, "save download session: %v", err)
+		return internalError("save download session", err)
 	}
 
 	// Send metadata first.
@@ -286,7 +301,7 @@ func (s *Server) Download(req *uploaderpb.DownloadRequest, stream uploaderpb.Tra
 			},
 		},
 	}); err != nil {
-		return status.Errorf(codes.Internal, "send metadata: %v", err)
+		return streamError("send metadata", err)
 	}
 
 	// Stream chunks.
@@ -303,7 +318,7 @@ func (s *Server) Download(req *uploaderpb.DownloadRequest, stream uploaderpb.Tra
 					},
 				},
 			}); err != nil {
-				return status.Errorf(codes.Internal, "send chunk: %v", err)
+				return streamError("send chunk", err)
 			}
 			offset += int64(n)
 			sess.DownloadedOffset = offset
@@ -313,7 +328,7 @@ func (s *Server) Download(req *uploaderpb.DownloadRequest, stream uploaderpb.Tra
 		}
 		if readErr != nil {
 			_ = s.sessions.SaveDownload(sess)
-			return status.Errorf(codes.Internal, "read file: %v", readErr)
+			return internalError("read file", readErr)
 		}
 	}
 
@@ -338,7 +353,7 @@ func (s *Server) QueryUpload(_ context.Context, req *uploaderpb.QueryUploadReque
 		if err == session.ErrSessionNotFound {
 			return nil, status.Error(codes.NotFound, "upload session not found")
 		}
-		return nil, status.Errorf(codes.Internal, "load session: %v", err)
+		return nil, internalError("load session", err)
 	}
 	return &uploaderpb.QueryUploadResponse{
 		SessionId:       sess.SessionID,
@@ -364,7 +379,7 @@ func (s *Server) QueryDownload(_ context.Context, req *uploaderpb.QueryDownloadR
 		if err == session.ErrSessionNotFound {
 			return nil, status.Error(codes.NotFound, "download session not found")
 		}
-		return nil, status.Errorf(codes.Internal, "load session: %v", err)
+		return nil, internalError("load session", err)
 	}
 	return &uploaderpb.QueryDownloadResponse{
 		SessionId:        sess.SessionID,
@@ -373,6 +388,42 @@ func (s *Server) QueryDownload(_ context.Context, req *uploaderpb.QueryDownloadR
 		FileHash:         sess.FileHash,
 		Expired:          false,
 	}, nil
+}
+
+// internalError logs the operation and the underlying error server-side and
+// returns a generic Internal status. The underlying error can carry server
+// filesystem paths and other internals, so it is logged, never sent to the
+// client (uploader#8).
+func internalError(op string, err error) error {
+	slog.Error("transfer service error", "op", op, "error", err)
+	return status.Error(codes.Internal, "internal error")
+}
+
+// streamError handles an error from a stream Recv or Send. Transport errors
+// carry the peer's status, not server internals, so the error is returned as
+// is, preserving its gRPC code. A client that cancels or disconnects is the
+// common case and is not a server fault, so it is logged at Debug; anything
+// else at Warn.
+func streamError(op string, err error) error {
+	if clientGone(err) {
+		slog.Debug("transfer stream ended by client", "op", op, "error", err)
+	} else {
+		slog.Warn("transfer stream error", "op", op, "error", err)
+	}
+	return err
+}
+
+// clientGone reports whether err is a client-side cancellation or disconnect
+// rather than a server fault.
+func clientGone(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+	switch status.Code(err) {
+	case codes.Canceled, codes.DeadlineExceeded, codes.Unavailable:
+		return true
+	}
+	return false
 }
 
 // compile-time check
