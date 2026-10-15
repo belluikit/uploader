@@ -32,6 +32,7 @@ var errInjected = errors.New("injected stream failure")
 type faultyServer struct {
 	*server.Server
 	uploadFaults    atomic.Int32
+	lostResponses   atomic.Int32
 	downloadFaults  atomic.Int32
 	noStartUpload   bool
 	uploadStreams   atomic.Int32
@@ -49,6 +50,13 @@ func (f *faultyServer) StartUpload(ctx context.Context, req *uploaderpb.StartUpl
 
 func (f *faultyServer) Upload(stream uploaderpb.TransferService_UploadServer) error {
 	f.uploadStreams.Add(1)
+	if f.lostResponses.Add(-1) >= 0 {
+		// The server finishes, and finalizes, the upload; its response never
+		// reaches the client.
+		_ = f.Server.Upload(&lostResponse{TransferService_UploadServer: stream})
+		return status.Error(codes.Unavailable, "injected: response lost")
+	}
+	f.lostResponses.Store(0)
 	if f.uploadFaults.Add(-1) < 0 {
 		f.uploadFaults.Store(0)
 		return f.Server.Upload(stream)
@@ -57,6 +65,12 @@ func (f *faultyServer) Upload(stream uploaderpb.TransferService_UploadServer) er
 	_ = f.Server.Upload(&brokenUpload{TransferService_UploadServer: stream, left: 1 + faultAfterMessages})
 	return status.Error(codes.Unavailable, "injected: connection lost")
 }
+
+type lostResponse struct {
+	uploaderpb.TransferService_UploadServer
+}
+
+func (lostResponse) SendAndClose(*uploaderpb.UploadResponse) error { return nil }
 
 type brokenUpload struct {
 	uploaderpb.TransferService_UploadServer
@@ -336,6 +350,29 @@ func TestUploadRetriesWhenSendFails(t *testing.T) {
 	}
 	if got := fs.uploadStreams.Load(); got != 2 {
 		t.Errorf("upload streams = %d, want 2 (one failure, one success)", got)
+	}
+	assertStored(t, c, res.FileID, content)
+}
+
+// The upload finished on the server but the response was lost: the retry
+// resumes from the committed end of a session that is already complete, and
+// must report success rather than fail to finalize the file a second time.
+func TestUploadRetryAfterLostResponse(t *testing.T) {
+	noBackoff(t)
+	fs := &faultyServer{}
+	fs.lostResponses.Store(1)
+	c := newTestClient(t, fs)
+	src, content := writeSource(t, 10*chunk)
+
+	res, err := c.Upload(context.Background(), src, WithChunkSize(chunk))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Complete || res.FileID == "" {
+		t.Fatalf("upload = %+v, want complete with a file ID", res)
+	}
+	if got := fs.uploadStreams.Load(); got != 2 {
+		t.Errorf("upload streams = %d, want 2", got)
 	}
 	assertStored(t, c, res.FileID, content)
 }
