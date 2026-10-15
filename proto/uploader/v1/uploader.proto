@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package uploader.v1;
 
-option go_package = "github.com/trendvidia/uploader/proto/uploader/v1;uploaderpb";
+option go_package = "github.com/belluikit/uploader/proto/uploader/v1;uploaderpb";
 
 // TransferService handles resumable file uploads and downloads.
 service TransferService {

@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	uploaderpb "github.com/trendvidia/uploader/proto/uploader/v1"
+	uploaderpb "github.com/belluikit/uploader/proto/uploader/v1"
 )
 
 // Upload sends a local file to the transfer service.

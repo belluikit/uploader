@@ -1,4 +1,4 @@
-module github.com/trendvidia/uploader
+module github.com/belluikit/uploader
 
 go 1.26.1
 
