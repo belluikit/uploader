@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
 	uploaderpb "github.com/belluikit/uploader/proto/uploader/v1"
@@ -373,5 +375,104 @@ func TestSessionExpiry(t *testing.T) {
 	}
 	if !qResp.Expired {
 		t.Error("expected session to be expired")
+	}
+}
+
+func TestStartUploadThenUpload(t *testing.T) {
+	client, cleanup := setup(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	content := bytes.Repeat([]byte("0123456789"), 300) // 3000 bytes
+	hash := sha256.Sum256(content)
+	meta := &uploaderpb.UploadMetadata{
+		Filename: "start.bin",
+		FileSize: int64(len(content)),
+		FileHash: hash[:],
+	}
+
+	// A new session exists, with an ID, before any data is sent.
+	start, err := client.StartUpload(ctx, &uploaderpb.StartUploadRequest{Metadata: meta})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if start.SessionId == "" {
+		t.Fatal("expected a session ID from StartUpload")
+	}
+	if start.CommittedOffset != 0 {
+		t.Fatalf("new session committed_offset = %d, want 0", start.CommittedOffset)
+	}
+	q, err := client.QueryUpload(ctx, &uploaderpb.QueryUploadRequest{SessionId: start.SessionId})
+	if err != nil {
+		t.Fatalf("QueryUpload on a started session: %v", err)
+	}
+	if !bytes.Equal(q.FileHash, hash[:]) {
+		t.Error("started session does not carry the file hash")
+	}
+
+	// Send the first half on that session.
+	half := len(content) / 2
+	stream, err := client.Upload(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withID := &uploaderpb.UploadMetadata{
+		SessionId: start.SessionId,
+		Filename:  meta.Filename,
+		FileSize:  meta.FileSize,
+		FileHash:  meta.FileHash,
+	}
+	if err := stream.Send(&uploaderpb.UploadRequest{Payload: &uploaderpb.UploadRequest_Metadata{Metadata: withID}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Send(&uploaderpb.UploadRequest{Payload: &uploaderpb.UploadRequest_Chunk{
+		Chunk: &uploaderpb.UploadChunk{Offset: 0, Data: content[:half]},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := stream.CloseAndRecv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.SessionId != start.SessionId {
+		t.Errorf("Upload used session %q, want the started %q", resp.SessionId, start.SessionId)
+	}
+	if resp.Complete {
+		t.Error("half an upload reported complete")
+	}
+
+	// StartUpload on the existing session reports where to resume.
+	again, err := client.StartUpload(ctx, &uploaderpb.StartUploadRequest{Metadata: withID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.SessionId != start.SessionId || again.CommittedOffset != int64(half) {
+		t.Errorf("StartUpload(existing) = (%q, %d), want (%q, %d)",
+			again.SessionId, again.CommittedOffset, start.SessionId, half)
+	}
+}
+
+func TestStartUploadValidation(t *testing.T) {
+	client, cleanup := setup(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	hash := sha256.Sum256([]byte("x"))
+	cases := map[string]*uploaderpb.StartUploadRequest{
+		"no metadata": {},
+		"no filename": {Metadata: &uploaderpb.UploadMetadata{FileSize: 1, FileHash: hash[:]}},
+		"no size":     {Metadata: &uploaderpb.UploadMetadata{Filename: "f", FileHash: hash[:]}},
+		"no hash":     {Metadata: &uploaderpb.UploadMetadata{Filename: "f", FileSize: 1}},
+	}
+	for name, req := range cases {
+		if _, err := client.StartUpload(ctx, req); status.Code(err) != codes.InvalidArgument {
+			t.Errorf("%s: got %v, want InvalidArgument", name, err)
+		}
+	}
+	unknown := &uploaderpb.StartUploadRequest{Metadata: &uploaderpb.UploadMetadata{
+		SessionId: "does-not-exist", Filename: "f", FileSize: 1, FileHash: hash[:],
+	}}
+	if _, err := client.StartUpload(ctx, unknown); status.Code(err) != codes.NotFound {
+		t.Errorf("unknown session: got %v, want NotFound", err)
 	}
 }

@@ -88,7 +88,7 @@ func main() {
 	}
 	fmt.Println("\nfile id:", res.FileID, "session:", res.SessionID, "complete:", res.Complete)
 
-	if err := c.Download(ctx, res.FileID, "copy.mp4"); err != nil {
+	if _, err := c.Download(ctx, res.FileID, "copy.mp4"); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -100,7 +100,11 @@ func main() {
 - `Client.Upload(ctx, path, opts...)` returns an `*UploadResult` with
   `SessionID`, `FileID`, `CommittedSize` and `Complete`.
 - `Client.Download(ctx, fileID, destPath, opts...)` writes the file to
-  `destPath`.
+  `destPath` and returns a `*DownloadResult` with `SessionID`, `Size` and
+  `Complete`.
+
+Both return their result even when they fail part-way, so the session ID is
+always available to resume with.
 
 Options:
 
@@ -109,7 +113,7 @@ Options:
 | `WithChunkSize(n)` | Upload chunk size in bytes (default 256 KB) |
 | `WithProgress(fn)` | Called after each chunk with bytes so far and the total |
 | `WithSessionID(id)` | Resume a previous upload or download session |
-| `WithMaxRetries(n)` | Accepted and stored, but not yet read by `Upload` or `Download` — it does not currently retry anything |
+| `WithMaxRetries(n)` | How many times a transfer resumes itself after a transient failure (default 3; 0 disables) |
 
 ## How resuming works
 
@@ -125,18 +129,23 @@ The server saves the committed offset after every chunk it writes, and moves
 the file from `staging/` to `files/` once the committed offset reaches the
 declared file size.
 
-The server returns the session ID only when the upload stream closes normally.
-So an upload that fails on its first attempt comes back with an empty
-`SessionID` in its `UploadResult`, and that attempt cannot be resumed through
-the SDK.
+A new upload first calls `StartUpload`, which creates the session before any
+data is sent. So an upload that fails part-way still returns its `SessionID`.
+Against a server without `StartUpload` the SDK falls back to sending without
+one, and only a completed upload reports its ID.
 
 **Download.** Pass a download session ID with `WithSessionID` and the same
 `destPath`. If `QueryDownload` reports the session as live, the SDK resumes from
 the current size of the file at `destPath` and sends the session's hash. The
 server refuses with `FailedPrecondition` if the stored file's hash no longer
-matches. The SDK's `Download` does not return the session ID, so it is
-available only to callers that use the gRPC API directly (the first
-`DownloadMetadata` message carries it).
+matches. `DownloadResult.SessionID` carries the ID to resume with.
+
+**Automatic retries.** When a transfer fails with a transient gRPC status
+(`Unavailable`, `ResourceExhausted`, `Aborted`, or `DeadlineExceeded` from the
+server rather than from your context), the SDK waits (200 ms, doubling up to
+5 s) and resumes, up to `WithMaxRetries` times. An upload resumes from the
+offset the server reports as committed; a download from the size of
+`destPath`. Cancelling the context stops retrying.
 
 ## gRPC API
 
@@ -145,6 +154,7 @@ available only to callers that use the gRPC API directly (the first
 
 | RPC | Shape | Purpose |
 |---|---|---|
+| `StartUpload` | unary | Creates an upload session before any data is sent (or reports an existing one), so the client knows its ID up front |
 | `Upload` | client stream → `UploadResponse` | First message is `UploadMetadata` (session ID or empty, filename, size, SHA-256, resume offset); the rest are `UploadChunk`s |
 | `Download` | `DownloadRequest` → server stream | First message is `DownloadMetadata` (session ID, size, SHA-256); the rest are `DownloadChunk`s |
 | `QueryUpload` | unary | Committed offset, file hash and expiry of an upload session |

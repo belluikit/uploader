@@ -67,14 +67,8 @@ func (s *Server) Upload(stream uploaderpb.TransferService_UploadServer) error {
 	if meta == nil {
 		return status.Error(codes.InvalidArgument, "first message must contain metadata")
 	}
-	if meta.Filename == "" {
-		return status.Error(codes.InvalidArgument, "filename is required")
-	}
-	if meta.FileSize <= 0 {
-		return status.Error(codes.InvalidArgument, "file_size must be positive")
-	}
-	if len(meta.FileHash) == 0 {
-		return status.Error(codes.InvalidArgument, "file_hash is required")
+	if err := validateUploadMetadata(meta); err != nil {
+		return err
 	}
 
 	sess, err := s.resolveUploadSession(meta)
@@ -124,23 +118,55 @@ func (s *Server) Upload(stream uploaderpb.TransferService_UploadServer) error {
 	})
 }
 
+// StartUpload creates an upload session, or validates and reports an existing
+// one, before any data is sent, so the client knows the session ID up front.
+func (s *Server) StartUpload(_ context.Context, req *uploaderpb.StartUploadRequest) (*uploaderpb.StartUploadResponse, error) {
+	meta := req.GetMetadata()
+	if meta == nil {
+		return nil, status.Error(codes.InvalidArgument, "metadata is required")
+	}
+	if err := validateUploadMetadata(meta); err != nil {
+		return nil, err
+	}
+	// An existing session is only reported, never rolled back: unlike Upload,
+	// StartUpload sends no data, so resume_offset carries no intent to rewind.
+	var sess *session.UploadSession
+	var err error
+	if meta.SessionId != "" {
+		sess, err = s.loadUploadSession(meta)
+	} else {
+		sess, err = s.resolveUploadSession(meta)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &uploaderpb.StartUploadResponse{
+		SessionId:       sess.SessionID,
+		CommittedOffset: sess.CommittedOffset,
+	}, nil
+}
+
+// validateUploadMetadata checks the fields every upload must carry.
+func validateUploadMetadata(meta *uploaderpb.UploadMetadata) error {
+	if meta.Filename == "" {
+		return status.Error(codes.InvalidArgument, "filename is required")
+	}
+	if meta.FileSize <= 0 {
+		return status.Error(codes.InvalidArgument, "file_size must be positive")
+	}
+	if len(meta.FileHash) == 0 {
+		return status.Error(codes.InvalidArgument, "file_hash is required")
+	}
+	return nil
+}
+
 // resolveUploadSession returns an existing session (for resume) or creates a new one.
 func (s *Server) resolveUploadSession(meta *uploaderpb.UploadMetadata) (*session.UploadSession, error) {
 	if meta.SessionId != "" {
 		// Resume existing session.
-		sess, err := s.sessions.LoadUpload(meta.SessionId)
+		sess, err := s.loadUploadSession(meta)
 		if err != nil {
-			if err == session.ErrSessionExpired {
-				return nil, status.Error(codes.FailedPrecondition, "session expired")
-			}
-			if err == session.ErrSessionNotFound {
-				return nil, status.Error(codes.NotFound, "upload session not found")
-			}
-			return nil, status.Errorf(codes.Internal, "load session: %v", err)
-		}
-		// Validate file integrity.
-		if !bytes.Equal(sess.FileHash, meta.FileHash) {
-			return nil, status.Error(codes.FailedPrecondition, "file changed since session was created")
+			return nil, err
 		}
 		// If client wants to resume at an earlier offset, truncate.
 		if meta.ResumeOffset < sess.CommittedOffset {
@@ -169,6 +195,25 @@ func (s *Server) resolveUploadSession(meta *uploaderpb.UploadMetadata) (*session
 	}
 	if err := s.sessions.SaveUpload(sess); err != nil {
 		return nil, status.Errorf(codes.Internal, "save new session: %v", err)
+	}
+	return sess, nil
+}
+
+// loadUploadSession loads the session named in meta and checks that it is for
+// the same file.
+func (s *Server) loadUploadSession(meta *uploaderpb.UploadMetadata) (*session.UploadSession, error) {
+	sess, err := s.sessions.LoadUpload(meta.SessionId)
+	if err != nil {
+		if err == session.ErrSessionExpired {
+			return nil, status.Error(codes.FailedPrecondition, "session expired")
+		}
+		if err == session.ErrSessionNotFound {
+			return nil, status.Error(codes.NotFound, "upload session not found")
+		}
+		return nil, status.Errorf(codes.Internal, "load session: %v", err)
+	}
+	if !bytes.Equal(sess.FileHash, meta.FileHash) {
+		return nil, status.Error(codes.FailedPrecondition, "file changed since session was created")
 	}
 	return sess, nil
 }
