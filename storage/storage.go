@@ -65,7 +65,10 @@ func NewFilesystem(baseDir string) (*Filesystem, error) {
 
 func (fs *Filesystem) CreateUpload(filename string) (string, error) {
 	fileID := generateFileID()
-	path := fs.stagingPath(fileID)
+	path, err := fs.stagingPath(fileID)
+	if err != nil {
+		return "", err
+	}
 	f, err := os.Create(path)
 	if err != nil {
 		return "", fmt.Errorf("create staging file: %w", err)
@@ -75,7 +78,11 @@ func (fs *Filesystem) CreateUpload(filename string) (string, error) {
 }
 
 func (fs *Filesystem) WriteChunk(fileID string, offset int64, data []byte) error {
-	f, err := os.OpenFile(fs.stagingPath(fileID), os.O_WRONLY, 0o644)
+	path, err := fs.stagingPath(fileID)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("open staging file: %w", err)
 	}
@@ -87,7 +94,11 @@ func (fs *Filesystem) WriteChunk(fileID string, offset int64, data []byte) error
 }
 
 func (fs *Filesystem) CommittedSize(fileID string) (int64, error) {
-	info, err := os.Stat(fs.stagingPath(fileID))
+	path, err := fs.stagingPath(fileID)
+	if err != nil {
+		return 0, err
+	}
+	info, err := os.Stat(path)
 	if err != nil {
 		return 0, fmt.Errorf("stat staging file: %w", err)
 	}
@@ -95,12 +106,22 @@ func (fs *Filesystem) CommittedSize(fileID string) (int64, error) {
 }
 
 func (fs *Filesystem) TruncateTo(fileID string, size int64) error {
-	return os.Truncate(fs.stagingPath(fileID), size)
+	path, err := fs.stagingPath(fileID)
+	if err != nil {
+		return err
+	}
+	return os.Truncate(path, size)
 }
 
 func (fs *Filesystem) FinalizeUpload(fileID string) error {
-	src := fs.stagingPath(fileID)
-	dst := fs.filePath(fileID)
+	src, err := fs.stagingPath(fileID)
+	if err != nil {
+		return err
+	}
+	dst, err := fs.filePath(fileID)
+	if err != nil {
+		return err
+	}
 	if err := os.Rename(src, dst); err != nil {
 		// Already finalized: the staging file is gone and the final one exists.
 		if errors.Is(err, os.ErrNotExist) {
@@ -114,7 +135,10 @@ func (fs *Filesystem) FinalizeUpload(fileID string) error {
 }
 
 func (fs *Filesystem) OpenFile(fileID string, offset int64) (io.ReadCloser, int64, error) {
-	path := fs.filePath(fileID)
+	path, err := fs.filePath(fileID)
+	if err != nil {
+		return nil, 0, err
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, 0, fmt.Errorf("stat file: %w", err)
@@ -133,7 +157,11 @@ func (fs *Filesystem) OpenFile(fileID string, offset int64) (io.ReadCloser, int6
 }
 
 func (fs *Filesystem) FileHash(fileID string) ([]byte, error) {
-	f, err := os.Open(fs.filePath(fileID))
+	path, err := fs.filePath(fileID)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open file for hash: %w", err)
 	}
@@ -146,27 +174,60 @@ func (fs *Filesystem) FileHash(fileID string) ([]byte, error) {
 }
 
 func (fs *Filesystem) DeleteStaging(fileID string) error {
-	err := os.Remove(fs.stagingPath(fileID))
-	if err != nil && !os.IsNotExist(err) {
+	path, err := fs.stagingPath(fileID)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
 }
 
 func (fs *Filesystem) Delete(fileID string) error {
-	err := os.Remove(fs.filePath(fileID))
-	if err != nil && !os.IsNotExist(err) {
+	path, err := fs.filePath(fileID)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
 }
 
-func (fs *Filesystem) stagingPath(fileID string) string {
-	return filepath.Join(fs.staging, fileID)
+// ErrInvalidFileID is returned for a file ID this package did not generate.
+// File IDs become path components, so only the exact form generateFileID
+// produces is accepted; anything else (a path separator, "..", wrong length)
+// could escape the staging and files directories.
+var ErrInvalidFileID = errors.New("invalid file ID")
+
+// ValidFileID reports whether id has the 32-lowercase-hex form that
+// generateFileID produces.
+func ValidFileID(id string) bool {
+	if len(id) != 32 {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
-func (fs *Filesystem) filePath(fileID string) string {
-	return filepath.Join(fs.files, fileID)
+func (fs *Filesystem) stagingPath(fileID string) (string, error) {
+	if !ValidFileID(fileID) {
+		return "", ErrInvalidFileID
+	}
+	return filepath.Join(fs.staging, fileID), nil
+}
+
+func (fs *Filesystem) filePath(fileID string) (string, error) {
+	if !ValidFileID(fileID) {
+		return "", ErrInvalidFileID
+	}
+	return filepath.Join(fs.files, fileID), nil
 }
 
 func generateFileID() string {
