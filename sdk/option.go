@@ -1,6 +1,20 @@
 // Package sdk provides a client library for the file transfer service.
 package sdk
 
+import "errors"
+
+// MaxChunkSize is the largest upload chunk WithChunkSize accepts. The server
+// uses gRPC's default 4 MiB message limit, and each chunk travels with a few
+// bytes of framing, so a chunk of exactly 4 MiB would be rejected; 1 KiB of
+// headroom keeps every accepted size below the limit.
+const MaxChunkSize = 4<<20 - 1<<10
+
+// ErrInvalidChunkSize is returned by Upload when the chunk size is not in
+// 1..MaxChunkSize. Checked before any network call: an oversized chunk would
+// otherwise fail at the server with ResourceExhausted, which the SDK treats
+// as transient and would retry pointlessly.
+var ErrInvalidChunkSize = errors.New("invalid chunk size")
+
 // ProgressFunc is called during upload/download with the current byte offset
 // and total file size.
 type ProgressFunc func(current, total int64)
@@ -30,7 +44,8 @@ func defaultOptions() options {
 	}
 }
 
-// WithChunkSize sets the chunk size in bytes for uploads.
+// WithChunkSize sets the chunk size in bytes for uploads, from 1 to
+// MaxChunkSize; Upload returns ErrInvalidChunkSize otherwise.
 func WithChunkSize(n int) Option {
 	return func(o *options) { o.chunkSize = n }
 }
