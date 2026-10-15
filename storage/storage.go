@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,7 +26,8 @@ type Backend interface {
 	// TruncateTo truncates the staging file to the given size.
 	TruncateTo(fileID string, size int64) error
 
-	// FinalizeUpload moves the staging file to permanent storage.
+	// FinalizeUpload moves the staging file to permanent storage. Finalizing
+	// an upload that is already final is not an error.
 	FinalizeUpload(fileID string) error
 
 	// OpenFile opens a finalized file for reading starting at offset.
@@ -100,6 +102,12 @@ func (fs *Filesystem) FinalizeUpload(fileID string) error {
 	src := fs.stagingPath(fileID)
 	dst := fs.filePath(fileID)
 	if err := os.Rename(src, dst); err != nil {
+		// Already finalized: the staging file is gone and the final one exists.
+		if errors.Is(err, os.ErrNotExist) {
+			if _, serr := os.Stat(dst); serr == nil {
+				return nil
+			}
+		}
 		return fmt.Errorf("finalize upload: %w", err)
 	}
 	return nil

@@ -152,3 +152,26 @@ func TestFilesystemDelete(t *testing.T) {
 		t.Error("expected error after delete")
 	}
 }
+
+func TestFilesystemFinalizeTwice(t *testing.T) {
+	fs, err := NewFilesystem(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := fs.CreateUpload("twice.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fs.WriteChunk(id, 0, []byte("payload")); err != nil {
+		t.Fatal(err)
+	}
+	if err := fs.FinalizeUpload(id); err != nil {
+		t.Fatalf("first finalize: %v", err)
+	}
+	if err := fs.FinalizeUpload(id); err != nil {
+		t.Fatalf("second finalize of the same upload: %v", err)
+	}
+	if err := fs.FinalizeUpload("never-created"); err == nil {
+		t.Fatal("finalizing an upload that never existed succeeded")
+	}
+}
