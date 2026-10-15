@@ -20,6 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	TransferService_StartUpload_FullMethodName   = "/uploader.v1.TransferService/StartUpload"
 	TransferService_Upload_FullMethodName        = "/uploader.v1.TransferService/Upload"
 	TransferService_Download_FullMethodName      = "/uploader.v1.TransferService/Download"
 	TransferService_QueryUpload_FullMethodName   = "/uploader.v1.TransferService/QueryUpload"
@@ -32,6 +33,11 @@ const (
 //
 // TransferService handles resumable file uploads and downloads.
 type TransferServiceClient interface {
+	// StartUpload creates an upload session before any data is sent, or reports
+	// the state of an existing one. Upload is client-streaming, so the server can
+	// only report a session ID when the stream completes; a client that calls
+	// StartUpload first knows the ID even if the stream breaks, and can resume.
+	StartUpload(ctx context.Context, in *StartUploadRequest, opts ...grpc.CallOption) (*StartUploadResponse, error)
 	// Upload streams file chunks from client to server.
 	// The first message must contain UploadMetadata; subsequent messages carry chunks.
 	Upload(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadRequest, UploadResponse], error)
@@ -50,6 +56,16 @@ type transferServiceClient struct {
 
 func NewTransferServiceClient(cc grpc.ClientConnInterface) TransferServiceClient {
 	return &transferServiceClient{cc}
+}
+
+func (c *transferServiceClient) StartUpload(ctx context.Context, in *StartUploadRequest, opts ...grpc.CallOption) (*StartUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartUploadResponse)
+	err := c.cc.Invoke(ctx, TransferService_StartUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *transferServiceClient) Upload(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadRequest, UploadResponse], error) {
@@ -110,6 +126,11 @@ func (c *transferServiceClient) QueryDownload(ctx context.Context, in *QueryDown
 //
 // TransferService handles resumable file uploads and downloads.
 type TransferServiceServer interface {
+	// StartUpload creates an upload session before any data is sent, or reports
+	// the state of an existing one. Upload is client-streaming, so the server can
+	// only report a session ID when the stream completes; a client that calls
+	// StartUpload first knows the ID even if the stream breaks, and can resume.
+	StartUpload(context.Context, *StartUploadRequest) (*StartUploadResponse, error)
 	// Upload streams file chunks from client to server.
 	// The first message must contain UploadMetadata; subsequent messages carry chunks.
 	Upload(grpc.ClientStreamingServer[UploadRequest, UploadResponse]) error
@@ -129,6 +150,9 @@ type TransferServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedTransferServiceServer struct{}
 
+func (UnimplementedTransferServiceServer) StartUpload(context.Context, *StartUploadRequest) (*StartUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartUpload not implemented")
+}
 func (UnimplementedTransferServiceServer) Upload(grpc.ClientStreamingServer[UploadRequest, UploadResponse]) error {
 	return status.Error(codes.Unimplemented, "method Upload not implemented")
 }
@@ -159,6 +183,24 @@ func RegisterTransferServiceServer(s grpc.ServiceRegistrar, srv TransferServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&TransferService_ServiceDesc, srv)
+}
+
+func _TransferService_StartUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransferServiceServer).StartUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TransferService_StartUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransferServiceServer).StartUpload(ctx, req.(*StartUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _TransferService_Upload_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -222,6 +264,10 @@ var TransferService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "uploader.v1.TransferService",
 	HandlerType: (*TransferServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "StartUpload",
+			Handler:    _TransferService_StartUpload_Handler,
+		},
 		{
 			MethodName: "QueryUpload",
 			Handler:    _TransferService_QueryUpload_Handler,

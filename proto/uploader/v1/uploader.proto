@@ -6,6 +6,12 @@ option go_package = "github.com/belluikit/uploader/proto/uploader/v1;uploaderpb"
 
 // TransferService handles resumable file uploads and downloads.
 service TransferService {
+  // StartUpload creates an upload session before any data is sent, or reports
+  // the state of an existing one. Upload is client-streaming, so the server can
+  // only report a session ID when the stream completes; a client that calls
+  // StartUpload first knows the ID even if the stream breaks, and can resume.
+  rpc StartUpload(StartUploadRequest) returns (StartUploadResponse);
+
   // Upload streams file chunks from client to server.
   // The first message must contain UploadMetadata; subsequent messages carry chunks.
   rpc Upload(stream UploadRequest) returns (UploadResponse);
@@ -36,6 +42,19 @@ message UploadMetadata {
   int64 file_size = 3;      // Total file size in bytes.
   bytes file_hash = 4;      // SHA-256 of the entire source file.
   int64 resume_offset = 5;  // Byte offset to resume from (0 for new).
+}
+
+// StartUploadRequest carries the metadata of the file to upload. With an empty
+// session_id a new session is created; with a session_id the existing session
+// is validated against file_hash and its state returned, as Upload would.
+message StartUploadRequest {
+  UploadMetadata metadata = 1;
+}
+
+// StartUploadResponse identifies the session to pass to Upload.
+message StartUploadResponse {
+  string session_id = 1;
+  int64 committed_offset = 2;  // Bytes already stored; resume from here.
 }
 
 // UploadChunk carries a segment of file data.

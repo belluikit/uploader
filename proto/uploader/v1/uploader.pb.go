@@ -182,6 +182,106 @@ func (x *UploadMetadata) GetResumeOffset() int64 {
 	return 0
 }
 
+// StartUploadRequest carries the metadata of the file to upload. With an empty
+// session_id a new session is created; with a session_id the existing session
+// is validated against file_hash and its state returned, as Upload would.
+type StartUploadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *UploadMetadata        `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartUploadRequest) Reset() {
+	*x = StartUploadRequest{}
+	mi := &file_uploader_v1_uploader_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartUploadRequest) ProtoMessage() {}
+
+func (x *StartUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_uploader_v1_uploader_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartUploadRequest.ProtoReflect.Descriptor instead.
+func (*StartUploadRequest) Descriptor() ([]byte, []int) {
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StartUploadRequest) GetMetadata() *UploadMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+// StartUploadResponse identifies the session to pass to Upload.
+type StartUploadResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SessionId       string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	CommittedOffset int64                  `protobuf:"varint,2,opt,name=committed_offset,json=committedOffset,proto3" json:"committed_offset,omitempty"` // Bytes already stored; resume from here.
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *StartUploadResponse) Reset() {
+	*x = StartUploadResponse{}
+	mi := &file_uploader_v1_uploader_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartUploadResponse) ProtoMessage() {}
+
+func (x *StartUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_uploader_v1_uploader_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartUploadResponse.ProtoReflect.Descriptor instead.
+func (*StartUploadResponse) Descriptor() ([]byte, []int) {
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StartUploadResponse) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *StartUploadResponse) GetCommittedOffset() int64 {
+	if x != nil {
+		return x.CommittedOffset
+	}
+	return 0
+}
+
 // UploadChunk carries a segment of file data.
 type UploadChunk struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -193,7 +293,7 @@ type UploadChunk struct {
 
 func (x *UploadChunk) Reset() {
 	*x = UploadChunk{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[2]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -205,7 +305,7 @@ func (x *UploadChunk) String() string {
 func (*UploadChunk) ProtoMessage() {}
 
 func (x *UploadChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[2]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -218,7 +318,7 @@ func (x *UploadChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadChunk.ProtoReflect.Descriptor instead.
 func (*UploadChunk) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{2}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UploadChunk) GetOffset() int64 {
@@ -248,7 +348,7 @@ type UploadResponse struct {
 
 func (x *UploadResponse) Reset() {
 	*x = UploadResponse{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[3]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -260,7 +360,7 @@ func (x *UploadResponse) String() string {
 func (*UploadResponse) ProtoMessage() {}
 
 func (x *UploadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[3]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -273,7 +373,7 @@ func (x *UploadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadResponse.ProtoReflect.Descriptor instead.
 func (*UploadResponse) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{3}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UploadResponse) GetSessionId() string {
@@ -317,7 +417,7 @@ type DownloadRequest struct {
 
 func (x *DownloadRequest) Reset() {
 	*x = DownloadRequest{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[4]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -329,7 +429,7 @@ func (x *DownloadRequest) String() string {
 func (*DownloadRequest) ProtoMessage() {}
 
 func (x *DownloadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[4]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -342,7 +442,7 @@ func (x *DownloadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadRequest.ProtoReflect.Descriptor instead.
 func (*DownloadRequest) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{4}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DownloadRequest) GetFileId() string {
@@ -387,7 +487,7 @@ type DownloadResponse struct {
 
 func (x *DownloadResponse) Reset() {
 	*x = DownloadResponse{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[5]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +499,7 @@ func (x *DownloadResponse) String() string {
 func (*DownloadResponse) ProtoMessage() {}
 
 func (x *DownloadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[5]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +512,7 @@ func (x *DownloadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadResponse.ProtoReflect.Descriptor instead.
 func (*DownloadResponse) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{5}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DownloadResponse) GetPayload() isDownloadResponse_Payload {
@@ -469,7 +569,7 @@ type DownloadMetadata struct {
 
 func (x *DownloadMetadata) Reset() {
 	*x = DownloadMetadata{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[6]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +581,7 @@ func (x *DownloadMetadata) String() string {
 func (*DownloadMetadata) ProtoMessage() {}
 
 func (x *DownloadMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[6]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +594,7 @@ func (x *DownloadMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadMetadata.ProtoReflect.Descriptor instead.
 func (*DownloadMetadata) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{6}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DownloadMetadata) GetSessionId() string {
@@ -536,7 +636,7 @@ type DownloadChunk struct {
 
 func (x *DownloadChunk) Reset() {
 	*x = DownloadChunk{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[7]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -548,7 +648,7 @@ func (x *DownloadChunk) String() string {
 func (*DownloadChunk) ProtoMessage() {}
 
 func (x *DownloadChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[7]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -561,7 +661,7 @@ func (x *DownloadChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadChunk.ProtoReflect.Descriptor instead.
 func (*DownloadChunk) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{7}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DownloadChunk) GetOffset() int64 {
@@ -588,7 +688,7 @@ type QueryUploadRequest struct {
 
 func (x *QueryUploadRequest) Reset() {
 	*x = QueryUploadRequest{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[8]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -600,7 +700,7 @@ func (x *QueryUploadRequest) String() string {
 func (*QueryUploadRequest) ProtoMessage() {}
 
 func (x *QueryUploadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[8]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -613,7 +713,7 @@ func (x *QueryUploadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryUploadRequest.ProtoReflect.Descriptor instead.
 func (*QueryUploadRequest) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{8}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *QueryUploadRequest) GetSessionId() string {
@@ -636,7 +736,7 @@ type QueryUploadResponse struct {
 
 func (x *QueryUploadResponse) Reset() {
 	*x = QueryUploadResponse{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[9]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -648,7 +748,7 @@ func (x *QueryUploadResponse) String() string {
 func (*QueryUploadResponse) ProtoMessage() {}
 
 func (x *QueryUploadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[9]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -661,7 +761,7 @@ func (x *QueryUploadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryUploadResponse.ProtoReflect.Descriptor instead.
 func (*QueryUploadResponse) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{9}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *QueryUploadResponse) GetSessionId() string {
@@ -702,7 +802,7 @@ type QueryDownloadRequest struct {
 
 func (x *QueryDownloadRequest) Reset() {
 	*x = QueryDownloadRequest{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[10]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -714,7 +814,7 @@ func (x *QueryDownloadRequest) String() string {
 func (*QueryDownloadRequest) ProtoMessage() {}
 
 func (x *QueryDownloadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[10]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -727,7 +827,7 @@ func (x *QueryDownloadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryDownloadRequest.ProtoReflect.Descriptor instead.
 func (*QueryDownloadRequest) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{10}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *QueryDownloadRequest) GetSessionId() string {
@@ -751,7 +851,7 @@ type QueryDownloadResponse struct {
 
 func (x *QueryDownloadResponse) Reset() {
 	*x = QueryDownloadResponse{}
-	mi := &file_uploader_v1_uploader_proto_msgTypes[11]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -763,7 +863,7 @@ func (x *QueryDownloadResponse) String() string {
 func (*QueryDownloadResponse) ProtoMessage() {}
 
 func (x *QueryDownloadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_uploader_v1_uploader_proto_msgTypes[11]
+	mi := &file_uploader_v1_uploader_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -776,7 +876,7 @@ func (x *QueryDownloadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryDownloadResponse.ProtoReflect.Descriptor instead.
 func (*QueryDownloadResponse) Descriptor() ([]byte, []int) {
-	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{11}
+	return file_uploader_v1_uploader_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *QueryDownloadResponse) GetSessionId() string {
@@ -829,7 +929,13 @@ const file_uploader_v1_uploader_proto_rawDesc = "" +
 	"\bfilename\x18\x02 \x01(\tR\bfilename\x12\x1b\n" +
 	"\tfile_size\x18\x03 \x01(\x03R\bfileSize\x12\x1b\n" +
 	"\tfile_hash\x18\x04 \x01(\fR\bfileHash\x12#\n" +
-	"\rresume_offset\x18\x05 \x01(\x03R\fresumeOffset\"9\n" +
+	"\rresume_offset\x18\x05 \x01(\x03R\fresumeOffset\"M\n" +
+	"\x12StartUploadRequest\x127\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1b.uploader.v1.UploadMetadataR\bmetadata\"_\n" +
+	"\x13StartUploadResponse\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12)\n" +
+	"\x10committed_offset\x18\x02 \x01(\x03R\x0fcommittedOffset\"9\n" +
 	"\vUploadChunk\x12\x16\n" +
 	"\x06offset\x18\x01 \x01(\x03R\x06offset\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\"\x8b\x01\n" +
@@ -876,8 +982,9 @@ const file_uploader_v1_uploader_proto_rawDesc = "" +
 	"\afile_id\x18\x02 \x01(\tR\x06fileId\x12+\n" +
 	"\x11downloaded_offset\x18\x03 \x01(\x03R\x10downloadedOffset\x12\x1b\n" +
 	"\tfile_hash\x18\x04 \x01(\fR\bfileHash\x12\x18\n" +
-	"\aexpired\x18\x05 \x01(\bR\aexpired2\xcb\x02\n" +
-	"\x0fTransferService\x12C\n" +
+	"\aexpired\x18\x05 \x01(\bR\aexpired2\x9d\x03\n" +
+	"\x0fTransferService\x12P\n" +
+	"\vStartUpload\x12\x1f.uploader.v1.StartUploadRequest\x1a .uploader.v1.StartUploadResponse\x12C\n" +
 	"\x06Upload\x12\x1a.uploader.v1.UploadRequest\x1a\x1b.uploader.v1.UploadResponse(\x01\x12I\n" +
 	"\bDownload\x12\x1c.uploader.v1.DownloadRequest\x1a\x1d.uploader.v1.DownloadResponse0\x01\x12P\n" +
 	"\vQueryUpload\x12\x1f.uploader.v1.QueryUploadRequest\x1a .uploader.v1.QueryUploadResponse\x12V\n" +
@@ -895,39 +1002,44 @@ func file_uploader_v1_uploader_proto_rawDescGZIP() []byte {
 	return file_uploader_v1_uploader_proto_rawDescData
 }
 
-var file_uploader_v1_uploader_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_uploader_v1_uploader_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_uploader_v1_uploader_proto_goTypes = []any{
 	(*UploadRequest)(nil),         // 0: uploader.v1.UploadRequest
 	(*UploadMetadata)(nil),        // 1: uploader.v1.UploadMetadata
-	(*UploadChunk)(nil),           // 2: uploader.v1.UploadChunk
-	(*UploadResponse)(nil),        // 3: uploader.v1.UploadResponse
-	(*DownloadRequest)(nil),       // 4: uploader.v1.DownloadRequest
-	(*DownloadResponse)(nil),      // 5: uploader.v1.DownloadResponse
-	(*DownloadMetadata)(nil),      // 6: uploader.v1.DownloadMetadata
-	(*DownloadChunk)(nil),         // 7: uploader.v1.DownloadChunk
-	(*QueryUploadRequest)(nil),    // 8: uploader.v1.QueryUploadRequest
-	(*QueryUploadResponse)(nil),   // 9: uploader.v1.QueryUploadResponse
-	(*QueryDownloadRequest)(nil),  // 10: uploader.v1.QueryDownloadRequest
-	(*QueryDownloadResponse)(nil), // 11: uploader.v1.QueryDownloadResponse
+	(*StartUploadRequest)(nil),    // 2: uploader.v1.StartUploadRequest
+	(*StartUploadResponse)(nil),   // 3: uploader.v1.StartUploadResponse
+	(*UploadChunk)(nil),           // 4: uploader.v1.UploadChunk
+	(*UploadResponse)(nil),        // 5: uploader.v1.UploadResponse
+	(*DownloadRequest)(nil),       // 6: uploader.v1.DownloadRequest
+	(*DownloadResponse)(nil),      // 7: uploader.v1.DownloadResponse
+	(*DownloadMetadata)(nil),      // 8: uploader.v1.DownloadMetadata
+	(*DownloadChunk)(nil),         // 9: uploader.v1.DownloadChunk
+	(*QueryUploadRequest)(nil),    // 10: uploader.v1.QueryUploadRequest
+	(*QueryUploadResponse)(nil),   // 11: uploader.v1.QueryUploadResponse
+	(*QueryDownloadRequest)(nil),  // 12: uploader.v1.QueryDownloadRequest
+	(*QueryDownloadResponse)(nil), // 13: uploader.v1.QueryDownloadResponse
 }
 var file_uploader_v1_uploader_proto_depIdxs = []int32{
 	1,  // 0: uploader.v1.UploadRequest.metadata:type_name -> uploader.v1.UploadMetadata
-	2,  // 1: uploader.v1.UploadRequest.chunk:type_name -> uploader.v1.UploadChunk
-	6,  // 2: uploader.v1.DownloadResponse.metadata:type_name -> uploader.v1.DownloadMetadata
-	7,  // 3: uploader.v1.DownloadResponse.chunk:type_name -> uploader.v1.DownloadChunk
-	0,  // 4: uploader.v1.TransferService.Upload:input_type -> uploader.v1.UploadRequest
-	4,  // 5: uploader.v1.TransferService.Download:input_type -> uploader.v1.DownloadRequest
-	8,  // 6: uploader.v1.TransferService.QueryUpload:input_type -> uploader.v1.QueryUploadRequest
-	10, // 7: uploader.v1.TransferService.QueryDownload:input_type -> uploader.v1.QueryDownloadRequest
-	3,  // 8: uploader.v1.TransferService.Upload:output_type -> uploader.v1.UploadResponse
-	5,  // 9: uploader.v1.TransferService.Download:output_type -> uploader.v1.DownloadResponse
-	9,  // 10: uploader.v1.TransferService.QueryUpload:output_type -> uploader.v1.QueryUploadResponse
-	11, // 11: uploader.v1.TransferService.QueryDownload:output_type -> uploader.v1.QueryDownloadResponse
-	8,  // [8:12] is the sub-list for method output_type
-	4,  // [4:8] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	4,  // 1: uploader.v1.UploadRequest.chunk:type_name -> uploader.v1.UploadChunk
+	1,  // 2: uploader.v1.StartUploadRequest.metadata:type_name -> uploader.v1.UploadMetadata
+	8,  // 3: uploader.v1.DownloadResponse.metadata:type_name -> uploader.v1.DownloadMetadata
+	9,  // 4: uploader.v1.DownloadResponse.chunk:type_name -> uploader.v1.DownloadChunk
+	2,  // 5: uploader.v1.TransferService.StartUpload:input_type -> uploader.v1.StartUploadRequest
+	0,  // 6: uploader.v1.TransferService.Upload:input_type -> uploader.v1.UploadRequest
+	6,  // 7: uploader.v1.TransferService.Download:input_type -> uploader.v1.DownloadRequest
+	10, // 8: uploader.v1.TransferService.QueryUpload:input_type -> uploader.v1.QueryUploadRequest
+	12, // 9: uploader.v1.TransferService.QueryDownload:input_type -> uploader.v1.QueryDownloadRequest
+	3,  // 10: uploader.v1.TransferService.StartUpload:output_type -> uploader.v1.StartUploadResponse
+	5,  // 11: uploader.v1.TransferService.Upload:output_type -> uploader.v1.UploadResponse
+	7,  // 12: uploader.v1.TransferService.Download:output_type -> uploader.v1.DownloadResponse
+	11, // 13: uploader.v1.TransferService.QueryUpload:output_type -> uploader.v1.QueryUploadResponse
+	13, // 14: uploader.v1.TransferService.QueryDownload:output_type -> uploader.v1.QueryDownloadResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_uploader_v1_uploader_proto_init() }
@@ -939,7 +1051,7 @@ func file_uploader_v1_uploader_proto_init() {
 		(*UploadRequest_Metadata)(nil),
 		(*UploadRequest_Chunk)(nil),
 	}
-	file_uploader_v1_uploader_proto_msgTypes[5].OneofWrappers = []any{
+	file_uploader_v1_uploader_proto_msgTypes[7].OneofWrappers = []any{
 		(*DownloadResponse_Metadata)(nil),
 		(*DownloadResponse_Chunk)(nil),
 	}
@@ -949,7 +1061,7 @@ func file_uploader_v1_uploader_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_uploader_v1_uploader_proto_rawDesc), len(file_uploader_v1_uploader_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
