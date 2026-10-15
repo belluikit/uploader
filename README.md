@@ -110,7 +110,7 @@ Options:
 
 | Option | Effect |
 |---|---|
-| `WithChunkSize(n)` | Upload chunk size in bytes (default 256 KB) |
+| `WithChunkSize(n)` | Upload chunk size in bytes (default 256 KB, at most `sdk.MaxChunkSize`, just under the server's 4 MiB message limit); `Upload` returns `ErrInvalidChunkSize` for a size outside 1..`MaxChunkSize` |
 | `WithProgress(fn)` | Called after each chunk with bytes so far and the total |
 | `WithSessionID(id)` | Resume a previous upload or download session |
 | `WithMaxRetries(n)` | How many times a transfer resumes itself after a transient failure (default 3; 0 disables) |

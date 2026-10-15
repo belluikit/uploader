@@ -26,6 +26,11 @@ func (c *Client) Upload(ctx context.Context, filePath string, opts ...Option) (*
 	for _, fn := range opts {
 		fn(&o)
 	}
+	// A zero chunk size would read nothing forever and a negative one panics;
+	// an oversized one is rejected by the server. Refuse all three up front.
+	if o.chunkSize < 1 || o.chunkSize > MaxChunkSize {
+		return nil, fmt.Errorf("%w: %d (must be 1..%d)", ErrInvalidChunkSize, o.chunkSize, MaxChunkSize)
+	}
 
 	// Compute file hash.
 	fileHash, fileSize, err := hashFile(filePath)

@@ -3,6 +3,7 @@ package sdk
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"net"
 	"os"
@@ -375,4 +376,69 @@ func TestUploadRetryAfterLostResponse(t *testing.T) {
 		t.Errorf("upload streams = %d, want 2", got)
 	}
 	assertStored(t, c, res.FileID, content)
+}
+
+// #10: a chunk size the server cannot accept, or one that cannot make
+// progress, is refused before any network call instead of failing at the
+// server with a ResourceExhausted the SDK would retry.
+func TestUploadRejectsInvalidChunkSize(t *testing.T) {
+	fs := &faultyServer{}
+	c := newTestClient(t, fs)
+	src, _ := writeSource(t, chunk)
+
+	for _, n := range []int{0, -1, MaxChunkSize + 1, 5 << 20} {
+		_, err := c.Upload(context.Background(), src, WithChunkSize(n))
+		if !errors.Is(err, ErrInvalidChunkSize) {
+			t.Errorf("WithChunkSize(%d): err = %v, want ErrInvalidChunkSize", n, err)
+		}
+	}
+	if got := fs.uploadStreams.Load(); got != 0 {
+		t.Errorf("upload streams = %d, want 0: invalid sizes must not reach the server", got)
+	}
+}
+
+// The cap is not too strict: a chunk of exactly MaxChunkSize goes through a
+// server with gRPC's default message limit.
+func TestUploadAtMaxChunkSize(t *testing.T) {
+	fs := &faultyServer{}
+	c := newTestClient(t, fs)
+	src, content := writeSource(t, MaxChunkSize+100)
+
+	res, err := c.Upload(context.Background(), src, WithChunkSize(MaxChunkSize), WithMaxRetries(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Complete {
+		t.Fatalf("upload not complete: %+v", res)
+	}
+	assertStored(t, c, res.FileID, content)
+}
+
+// The cap is needed: a raw 4 MiB chunk, sent past the SDK's check, is
+// rejected by the server's default message limit with ResourceExhausted.
+func TestRawFourMiBChunkExceedsServerLimit(t *testing.T) {
+	fs := &faultyServer{}
+	c := newTestClient(t, fs)
+	ctx := context.Background()
+	data := make([]byte, 4<<20)
+	hash := sha256.Sum256(data)
+	meta := &uploaderpb.UploadMetadata{Filename: "f", FileSize: int64(len(data)), FileHash: hash[:]}
+
+	start, err := c.rpc.StartUpload(ctx, &uploaderpb.StartUploadRequest{Metadata: meta})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta.SessionId = start.SessionId
+	stream, err := c.rpc.Upload(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = stream.Send(&uploaderpb.UploadRequest{Payload: &uploaderpb.UploadRequest_Metadata{Metadata: meta}})
+	_ = stream.Send(&uploaderpb.UploadRequest{Payload: &uploaderpb.UploadRequest_Chunk{
+		Chunk: &uploaderpb.UploadChunk{Offset: 0, Data: data},
+	}})
+	_, err = stream.CloseAndRecv()
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("raw 4 MiB chunk: %v, want ResourceExhausted", err)
+	}
 }
