@@ -881,7 +881,7 @@ const file_uploader_v1_uploader_proto_rawDesc = "" +
 	"\x06Upload\x12\x1a.uploader.v1.UploadRequest\x1a\x1b.uploader.v1.UploadResponse(\x01\x12I\n" +
 	"\bDownload\x12\x1c.uploader.v1.DownloadRequest\x1a\x1d.uploader.v1.DownloadResponse0\x01\x12P\n" +
 	"\vQueryUpload\x12\x1f.uploader.v1.QueryUploadRequest\x1a .uploader.v1.QueryUploadResponse\x12V\n" +
-	"\rQueryDownload\x12!.uploader.v1.QueryDownloadRequest\x1a\".uploader.v1.QueryDownloadResponseB=Z;github.com/trendvidia/uploader/proto/uploader/v1;uploaderpbb\x06proto3"
+	"\rQueryDownload\x12!.uploader.v1.QueryDownloadRequest\x1a\".uploader.v1.QueryDownloadResponseB<Z:github.com/belluikit/uploader/proto/uploader/v1;uploaderpbb\x06proto3"
 
 var (
 	file_uploader_v1_uploader_proto_rawDescOnce sync.Once

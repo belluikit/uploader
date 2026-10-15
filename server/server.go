@@ -11,9 +11,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	uploaderpb "github.com/trendvidia/uploader/proto/uploader/v1"
-	"github.com/trendvidia/uploader/session"
-	"github.com/trendvidia/uploader/storage"
+	uploaderpb "github.com/belluikit/uploader/proto/uploader/v1"
+	"github.com/belluikit/uploader/session"
+	"github.com/belluikit/uploader/storage"
 )
 
 const defaultDownloadChunkSize = 256 * 1024 // 256 KB

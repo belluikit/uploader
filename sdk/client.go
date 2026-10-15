@@ -4,7 +4,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	uploaderpb "github.com/trendvidia/uploader/proto/uploader/v1"
+	uploaderpb "github.com/belluikit/uploader/proto/uploader/v1"
 )
 
 // Client provides upload and download operations against the transfer service.

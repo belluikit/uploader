@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	uploaderpb "github.com/trendvidia/uploader/proto/uploader/v1"
+	uploaderpb "github.com/belluikit/uploader/proto/uploader/v1"
 )
 
 // Download retrieves a file from the transfer service and writes it to destPath.

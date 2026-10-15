@@ -13,10 +13,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	uploaderpb "github.com/trendvidia/uploader/proto/uploader/v1"
-	"github.com/trendvidia/uploader/server"
-	"github.com/trendvidia/uploader/session"
-	"github.com/trendvidia/uploader/storage"
+	uploaderpb "github.com/belluikit/uploader/proto/uploader/v1"
+	"github.com/belluikit/uploader/server"
+	"github.com/belluikit/uploader/session"
+	"github.com/belluikit/uploader/storage"
 )
 
 func main() {
