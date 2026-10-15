@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The server writes, seeks and truncates files, so filesystem
+        # behaviour differs enough by OS to test all three.
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Formatting
+        if: runner.os == 'Linux'
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+  proto:
+    # The gRPC API is a contract with every client, so a pull request may not
+    # break it, and the committed generated code must match the .proto files.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: Lint
+        run: buf lint
+
+      - name: Breaking changes against main
+        if: github.event_name == 'pull_request'
+        run: buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main"
+
+      - name: Generated code is up to date
+        # buf.gen.yaml pins the plugin versions, so regenerating an unchanged
+        # .proto reproduces the committed files exactly.
+        run: |
+          go install golang.org/x/tools/cmd/goimports@v0.37.0
+          buf generate
+          "$(go env GOPATH)/bin/goimports" -w proto/uploader/v1/*.go
+          if ! git diff --exit-code -- proto/; then
+            echo "::error::Generated code is out of date. Run: buf generate && goimports -w proto/uploader/v1/*.go"
+            exit 1
+          fi
