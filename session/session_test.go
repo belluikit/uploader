@@ -13,7 +13,7 @@ func TestUploadSessionRoundTrip(t *testing.T) {
 	}
 
 	sess := &UploadSession{
-		SessionID:       "test-upload-123",
+		SessionID:       "11111111111111111111111111111111",
 		Filename:        "hello.txt",
 		FileSize:        1024,
 		FileHash:        []byte{0xde, 0xad, 0xbe, 0xef},
@@ -26,7 +26,7 @@ func TestUploadSessionRoundTrip(t *testing.T) {
 		t.Fatal("save:", err)
 	}
 
-	loaded, err := store.LoadUpload("test-upload-123")
+	loaded, err := store.LoadUpload("11111111111111111111111111111111")
 	if err != nil {
 		t.Fatal("load:", err)
 	}
@@ -59,7 +59,7 @@ func TestDownloadSessionRoundTrip(t *testing.T) {
 	}
 
 	sess := &DownloadSession{
-		SessionID:        "test-download-456",
+		SessionID:        "22222222222222222222222222222222",
 		FileID:           "file-xyz",
 		Filename:         "data.bin",
 		FileSize:         2048,
@@ -72,7 +72,7 @@ func TestDownloadSessionRoundTrip(t *testing.T) {
 		t.Fatal("save:", err)
 	}
 
-	loaded, err := store.LoadDownload("test-download-456")
+	loaded, err := store.LoadDownload("22222222222222222222222222222222")
 	if err != nil {
 		t.Fatal("load:", err)
 	}
@@ -97,7 +97,7 @@ func TestSessionExpiry(t *testing.T) {
 	store.SetTTL(1 * time.Second)
 
 	sess := &UploadSession{
-		SessionID: "expire-me",
+		SessionID: "33333333333333333333333333333333",
 		Filename:  "old.txt",
 		FileSize:  100,
 		FileHash:  []byte{1},
@@ -110,14 +110,14 @@ func TestSessionExpiry(t *testing.T) {
 	}
 
 	// Should load fine immediately.
-	if _, err := store.LoadUpload("expire-me"); err != nil {
+	if _, err := store.LoadUpload("33333333333333333333333333333333"); err != nil {
 		t.Fatal("expected success, got:", err)
 	}
 
 	// Wait for expiry.
 	time.Sleep(2 * time.Second)
 
-	_, err = store.LoadUpload("expire-me")
+	_, err = store.LoadUpload("33333333333333333333333333333333")
 	if err != ErrSessionExpired {
 		t.Errorf("expected ErrSessionExpired, got: %v", err)
 	}

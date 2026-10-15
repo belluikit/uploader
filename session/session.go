@@ -20,6 +20,27 @@ var ErrSessionExpired = errors.New("session expired")
 // ErrSessionNotFound is returned when a session file does not exist.
 var ErrSessionNotFound = errors.New("session not found")
 
+// ErrInvalidSessionID is returned for a session ID this package did not
+// generate. Session IDs become path components, so only the exact form
+// NewSessionID produces is accepted; anything else (a path separator, "..",
+// wrong length) could escape the session directories.
+var ErrInvalidSessionID = errors.New("invalid session ID")
+
+// ValidSessionID reports whether id has the 32-lowercase-hex form that
+// NewSessionID produces.
+func ValidSessionID(id string) bool {
+	if len(id) != 32 {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
 // DefaultTTL is the default time-to-live for sessions (24 hours).
 const DefaultTTL = 24 * time.Hour
 
@@ -95,13 +116,21 @@ func (s *Store) SaveUpload(sess *UploadSession) error {
 	if err != nil {
 		return fmt.Errorf("marshal upload session: %w", err)
 	}
-	return atomicWrite(s.uploadPath(sess.SessionID), data)
+	path, err := s.uploadPath(sess.SessionID)
+	if err != nil {
+		return err
+	}
+	return atomicWrite(path, data)
 }
 
 // LoadUpload reads an upload session. Returns ErrSessionNotFound if missing,
 // ErrSessionExpired if the session exceeded its TTL (and deletes it).
 func (s *Store) LoadUpload(sessionID string) (*UploadSession, error) {
-	path := s.uploadPath(sessionID)
+	path, err := s.uploadPath(sessionID)
+	if err != nil {
+		// An ID that cannot name a session file names no session.
+		return nil, ErrSessionNotFound
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -122,8 +151,11 @@ func (s *Store) LoadUpload(sessionID string) (*UploadSession, error) {
 
 // DeleteUpload removes an upload session file.
 func (s *Store) DeleteUpload(sessionID string) error {
-	err := os.Remove(s.uploadPath(sessionID))
-	if err != nil && !os.IsNotExist(err) {
+	path, err := s.uploadPath(sessionID)
+	if err != nil {
+		return nil // nothing an invalid ID could have created
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
@@ -136,13 +168,21 @@ func (s *Store) SaveDownload(sess *DownloadSession) error {
 	if err != nil {
 		return fmt.Errorf("marshal download session: %w", err)
 	}
-	return atomicWrite(s.downloadPath(sess.SessionID), data)
+	path, err := s.downloadPath(sess.SessionID)
+	if err != nil {
+		return err
+	}
+	return atomicWrite(path, data)
 }
 
 // LoadDownload reads a download session. Returns ErrSessionNotFound if missing,
 // ErrSessionExpired if the session exceeded its TTL (and deletes it).
 func (s *Store) LoadDownload(sessionID string) (*DownloadSession, error) {
-	path := s.downloadPath(sessionID)
+	path, err := s.downloadPath(sessionID)
+	if err != nil {
+		// An ID that cannot name a session file names no session.
+		return nil, ErrSessionNotFound
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -163,8 +203,11 @@ func (s *Store) LoadDownload(sessionID string) (*DownloadSession, error) {
 
 // DeleteDownload removes a download session file.
 func (s *Store) DeleteDownload(sessionID string) error {
-	err := os.Remove(s.downloadPath(sessionID))
-	if err != nil && !os.IsNotExist(err) {
+	path, err := s.downloadPath(sessionID)
+	if err != nil {
+		return nil // nothing an invalid ID could have created
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
@@ -213,12 +256,18 @@ func (s *Store) Sweep() (int, error) {
 	return removed, nil
 }
 
-func (s *Store) uploadPath(id string) string {
-	return filepath.Join(s.dir, "upload", id+".session")
+func (s *Store) uploadPath(id string) (string, error) {
+	if !ValidSessionID(id) {
+		return "", ErrInvalidSessionID
+	}
+	return filepath.Join(s.dir, "upload", id+".session"), nil
 }
 
-func (s *Store) downloadPath(id string) string {
-	return filepath.Join(s.dir, "download", id+".session")
+func (s *Store) downloadPath(id string) (string, error) {
+	if !ValidSessionID(id) {
+		return "", ErrInvalidSessionID
+	}
+	return filepath.Join(s.dir, "download", id+".session"), nil
 }
 
 // atomicWrite writes data to path via a temporary file + rename.
