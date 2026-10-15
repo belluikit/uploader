@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -118,16 +119,33 @@ func TestDownloadRejectsTraversalSessionID(t *testing.T) {
 	content := []byte("hello")
 	up := mustUpload(t, client, content)
 
+	// "../../escaped" from dir/sessions/download/ would land at dir/escaped.session,
+	// inside the tree we walk, so a real escape would be caught here.
 	_, err := drainDownload(t, client, &uploaderpb.DownloadRequest{
 		FileId:    up.FileId,
-		SessionId: "../../../../tmp/evil",
+		SessionId: "../../escaped",
 	})
 	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("Download with traversal session_id: code = %v, want InvalidArgument", status.Code(err))
+		t.Errorf("Download with traversal session_id: code = %v, want InvalidArgument", status.Code(err))
 	}
-	// No .session file escaped into the temp dir root.
-	if _, err := os.Stat(filepath.Join(dir, "..", "tmp", "evil.session")); err == nil {
-		t.Fatal("a session file was written outside the sessions directory")
+	assertNoSessionFileOutside(t, dir, filepath.Join(dir, "sessions"))
+}
+
+// assertNoSessionFileOutside fails if any .session file under root lies outside
+// storeDir, i.e. a session ID escaped the store.
+func assertNoSessionFileOutside(t *testing.T, root, storeDir string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(p) != ".session" {
+			return nil
+		}
+		if rel, _ := filepath.Rel(storeDir, p); strings.HasPrefix(rel, "..") {
+			t.Errorf("session file escaped the store: %s", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -161,6 +179,14 @@ func TestDownloadMissingFileHasNoPathInError(t *testing.T) {
 	}
 	if msg := status.Convert(err).Message(); strings.Contains(msg, dir) || strings.Contains(msg, "/") {
 		t.Errorf("error message %q leaks a server path", msg)
+	}
+
+	// A resume (FileHash set) of a missing file is NotFound too, not Internal:
+	// the file is opened before the integrity check.
+	hash := sha256.Sum256([]byte("whatever"))
+	_, err = drainDownload(t, client, &uploaderpb.DownloadRequest{FileId: missing, FileHash: hash[:], Offset: 0})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("resume of missing file: code = %v, want NotFound", status.Code(err))
 	}
 }
 
