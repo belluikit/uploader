@@ -1,3 +1,21 @@
 # Compiled binaries
-demo
-uploader
+/demo
+/uploader
+
+# OS and editor files, Go test and profiling output
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+*.test
+*.out
+*.prof
+coverage.out
+coverage.html
+coverage.txt
+
+# Binaries from `go build` of this repository's main packages, anchored to
+# the root so they cannot match a source directory of the same name
+/uploader.exe
