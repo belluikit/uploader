@@ -24,7 +24,7 @@ Requires Go 1.26.1 or later (see `go.mod`).
 The SDK, for a Go client:
 
 ```sh
-go get github.com/belluikit/uploader
+go get github.com/belluikit/uploader/sdk@latest
 ```
 
 The server binary:
